@@ -85,6 +85,7 @@ public class AsyncSocketServer implements Server, Publisher<IoTransport>{
 					
 					try {
 						
+						// accept again, it's the reactor style
 						serverSocketChannel.accept(serverSocketChannel, this);
 						
 						asynchronousSocketChannel.setOption(StandardSocketOptions.SO_REUSEADDR, true);
