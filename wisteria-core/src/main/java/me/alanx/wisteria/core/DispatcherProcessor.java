@@ -25,7 +25,7 @@ public class DispatcherProcessor implements Processor<Message, Message> {
 
 	@Override
 	public void onNext(Message m) {
-		log.debug("Client: message received. Message: {}", m);		
+		log.debug("Server: message received. Message: {}", m);
 		
 		m.getSession().getTransport().write(m);
 	}

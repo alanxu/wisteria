@@ -87,7 +87,7 @@ public class App {
 
 			@Override
 			public void onNext(Message m) {
-				System.out.println("Client: " + m);
+				System.out.println("Client Received: " + m);
 			}
 
 			@Override
