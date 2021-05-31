@@ -1,36 +1,24 @@
 package me.alanx.wisteria.core.socket;
 
+import me.alanx.wisteria.config.Configuration;
+import me.alanx.wisteria.core.Server;
+import me.alanx.wisteria.core.ServerListener;
+import org.apache.commons.lang3.StringUtils;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import java.net.StandardSocketOptions;
-import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousChannelGroup;
 import java.nio.channels.AsynchronousServerSocketChannel;
 import java.nio.channels.AsynchronousSocketChannel;
 import java.nio.channels.CompletionHandler;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import org.apache.commons.lang3.StringUtils;
-
-import me.alanx.wisteria.config.Configuration;
-import me.alanx.wisteria.core.Server;
-import me.alanx.wisteria.core.protocol.Message;
-import me.alanx.wisteria.core.protocol.ProtocolProvider;
-import me.alanx.wisteria.core.reactor.PassiveSubscription;
-import me.alanx.wisteria.core.reactor.Publisher;
-import me.alanx.wisteria.core.reactor.SubscribeMode;
-import me.alanx.wisteria.core.reactor.Subscriber;
-import me.alanx.wisteria.core.reactor.Subscription;
-import me.alanx.wisteria.core.session.Session;
-import me.alanx.wisteria.core.session.Session;
-import me.alanx.wisteria.core.session.SessionManager;
-import me.alanx.wisteria.core.transport.IoTransport;
-import me.alanx.wisteria.core.transport.ProtocoledTransport;
-import me.alanx.wisteria.core.transport.TransportListener;
-
-public class AsyncSocketServer implements Server, Publisher<IoTransport>{
+public class AsyncSocketServer implements Server {
 
 	private final SocketAddress address;
 		
@@ -42,7 +30,9 @@ public class AsyncSocketServer implements Server, Publisher<IoTransport>{
 	
 	private Configuration configration;
 	
-	private Subscriber<? super IoTransport> connectionSubscriber;
+	private List<ServerListener> listeners = new ArrayList<>();
+
+
 	
 	public AsyncSocketServer(String serverIp, 
 			int serverPort, 
@@ -61,8 +51,8 @@ public class AsyncSocketServer implements Server, Publisher<IoTransport>{
 	@Override
 	public void start() {
 		
-		if(this.connectionSubscriber == null) {
-			throw new IllegalStateException("No connection subscriber. ");
+		if(this.listeners == null) {
+			throw new IllegalStateException("No connection listeners. ");
 		}
 		
 		//TODO refactor thread pool creating and management
@@ -96,8 +86,10 @@ public class AsyncSocketServer implements Server, Publisher<IoTransport>{
 						AsyncSocketTransport socketTransport = AsyncSocketTransport
 								.open(asynchronousSocketChannel);
 						
-						AsyncSocketServer.this.connectionSubscriber.onNext(socketTransport);
-						
+//						AsyncSocketServer.this.connectionSubscriber.onNext(socketTransport);
+						for (ServerListener l : AsyncSocketServer.this.listeners) {
+							l.onTransportCreated(socketTransport);
+						}
 						
 						
 						//----
@@ -135,10 +127,11 @@ public class AsyncSocketServer implements Server, Publisher<IoTransport>{
 	}
 
 	@Override
-	public void subscribe(Subscriber<? super IoTransport> s) {
-		this.connectionSubscriber = s;
-		
+	public Server listenedBy(ServerListener listener) {
+		this.listeners.add(listener);
+		return this;
 	}
+
 	
 
 }

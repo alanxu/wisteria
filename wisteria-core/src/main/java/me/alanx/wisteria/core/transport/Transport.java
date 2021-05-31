@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.Future;
 
-import me.alanx.wisteria.core.reactor.SubscribeMode;
-
 public interface Transport <I, O> {
 
 	/**
@@ -20,8 +18,6 @@ public interface Transport <I, O> {
 //	 <T> void read(long timeout, TimeUnit unit, T attachement, CompletionHandler<I, T> handler);
 	
 	 Future<I> read();
-	 
-	 Transport <I, O> withReadMode(SubscribeMode mode);
 	 
 	// Transport <I, O> listenedBy(SessionListener<I> sessionListener);
 	 

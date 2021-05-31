@@ -1,31 +1,19 @@
 package a;
 
+import me.alanx.wisteria.core.MessageQueuePusher;
+import me.alanx.wisteria.core.socket.AsyncClientSocketTransport;
+import me.alanx.wisteria.core.socket.AsyncSocketServer;
+import me.alanx.wisteria.core.transport.IoTransport;
+import me.alanx.wisteria.core.transport.TransportListener;
+import me.alanx.wisteria.utils.BufferUtil;
+
 import java.nio.ByteBuffer;
 import java.nio.charset.CharacterCodingException;
 import java.nio.charset.Charset;
+import java.util.Queue;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
-
-import me.alanx.wisteria.core.DispatcherProcessor;
-import me.alanx.wisteria.core.ProtocoledProcessor;
-import me.alanx.wisteria.core.SessionInitializationProcessor;
-import me.alanx.wisteria.core.filter.BasicFilterChainBuilder;
-import me.alanx.wisteria.core.filter.FilterChainBuilder;
-import me.alanx.wisteria.core.filter.FilteredProtocolProvider;
-import me.alanx.wisteria.core.protocol.BasicProtocol;
-import me.alanx.wisteria.core.protocol.Message;
-import me.alanx.wisteria.core.protocol.Protocol;
-import me.alanx.wisteria.core.protocol.ProtocolProvider;
-import me.alanx.wisteria.core.reactor.Subscriber;
-import me.alanx.wisteria.core.reactor.Subscription;
-import me.alanx.wisteria.core.service.HeartbeatService;
-import me.alanx.wisteria.core.session.Session;
-import me.alanx.wisteria.core.session.SessionManager;
-import me.alanx.wisteria.core.socket.AsyncSocketServer;
-import me.alanx.wisteria.core.socket.ServerHandler;
-import me.alanx.wisteria.core.transport.BasicProtocoledClientTransport;
 
 public class App {
 
@@ -34,105 +22,53 @@ public class App {
 	}
 
 	public static void main(String[] args) {
-		
-		Protocol<Message> protocol = new BasicProtocol();
+
 		
 		ExecutorService serverExecutor = Executors.newCachedThreadPool();
-		
-		FilterChainBuilder fcb = new BasicFilterChainBuilder();
-		
-		ProtocolProvider pp = new FilteredProtocolProvider(protocol, fcb);
-		
-		SessionManager sessionManager = new SessionManager(pp);
-		
-		SessionInitializationProcessor sessionInitialProcessor = new SessionInitializationProcessor(sessionManager);
-		
-		ProtocoledProcessor protocolProcessor = new ProtocoledProcessor(fcb, serverExecutor);
-		
-		DispatcherProcessor dispatcherProcessor = new DispatcherProcessor();
+
+		Queue<ByteBuffer> messageQueue = new ArrayBlockingQueue<>(1024);
+
+		MessageQueuePusher queuePusher = new MessageQueuePusher(serverExecutor, messageQueue);
 		
 
-		ServerHandler serverHandler = new ServerHandler() {
-
-			@Override
-			public void handle(Session session, Message message) {
-				
-				System.out.println("Server: " + message);
-
-				session.getTransport().write(message);
-			}
-			
-		};
 
 		AsyncSocketServer server = new AsyncSocketServer("localhost", 1234, serverExecutor);
-		
-		server.subscribe(sessionInitialProcessor);
-		
-		sessionInitialProcessor.subscribe(protocolProcessor);
-		
-		protocolProcessor.subscribe(dispatcherProcessor);
+
+		server.listenedBy(queuePusher);
 		
 		server.start();
-		
-		
 
-		
-		Subscriber<Message> clientSubscriber = new Subscriber<Message> (){
 
+		TransportListener<ByteBuffer> clientListener = new TransportListener<ByteBuffer>() {
 			@Override
-			public <A> void onSubscribe(Subscription subscription) {
-				// TODO Auto-generated method stub
-				
+			public void onConnected() {
+
 			}
 
 			@Override
-			public void onNext(Message m) {
-				System.out.println("Client Received: " + m);
+			public void onDisconnected() {
+
 			}
 
 			@Override
-			public void onError(Throwable t) {
-				// TODO Auto-generated method stub
-				
+			public void onReceived(IoTransport transport, ByteBuffer data) {
+				data.flip();
+				System.out.println("Client Received: " + BufferUtil.readString(data));
 			}
 
 			@Override
-			public void onCompletion() {
-				// TODO Auto-generated method stub
-				
+			public void onSent(IoTransport transport, ByteBuffer data) {
+
 			}
-			
 		};
 			
-		
-			
-
 		Runnable writer = () -> {
-			
-			BasicProtocoledClientTransport client = BasicProtocoledClientTransport
-					.open()
-					.protocol(protocol)
-					.subscribedBy(clientSubscriber)
-					.connect("localhost", 1234);
-			
-			
-			ScheduledExecutorService executor = Executors.newScheduledThreadPool(1);
-			
-			
-			
-			HeartbeatService hbSvc = new HeartbeatService(executor, client);
-			hbSvc.start();
-			
-			for (;;) {
+			AsyncClientSocketTransport client = AsyncClientSocketTransport.open();
+			client.listenedBy(clientListener).connect("localhost", 1234);
 
-				
 
-				Future<Integer> f = client.write(new Message() {
-					@Override
-					public String toString() {
-						return "hello message and something";
-					}
-				});
+			while (true) {
+				client.write(ByteBuffer.wrap("Test Message. ".getBytes(Charset.defaultCharset())));
 
 				try {
 					Thread.sleep(1000);
@@ -142,6 +78,9 @@ public class App {
 			}
 
 		};
+			
+
+
 
 		Thread t1 = new Thread(writer);
 		t1.start();

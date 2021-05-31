@@ -11,6 +11,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import me.alanx.wisteria.core.transport.ClientTransport;
 import me.alanx.wisteria.core.transport.IoClientTransport;
+import me.alanx.wisteria.core.transport.TransportListener;
 
 
 public class AsyncClientSocketTransport extends AsyncSocketTransport implements IoClientTransport{
@@ -47,7 +48,11 @@ public class AsyncClientSocketTransport extends AsyncSocketTransport implements 
 		return null;
 	}
 
-	
+	@Override
+	public AsyncClientSocketTransport listenedBy(TransportListener listener) {
+		super.listenedBy(listener);
+		return this;
+	}
 	
 	public AsyncClientSocketTransport requireHandshake(boolean required) {
 		this.handshakeRequired.set(required);

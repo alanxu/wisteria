@@ -6,8 +6,8 @@ public interface TransportListener<T> {
 	
 	public void onDisconnected();
 	
-	public void onReceived(T data);
+	public void onReceived(IoTransport transport, T data);
 	
-	public void onSent(T data);
+	public void onSent(IoTransport transport, T data);
 	
 }

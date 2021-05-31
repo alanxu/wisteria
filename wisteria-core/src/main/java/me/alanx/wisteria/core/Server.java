@@ -5,5 +5,6 @@ public interface Server {
 	void start();
 	
 	void shutdown();
-	
+
+	Server listenedBy(ServerListener listener);
 }

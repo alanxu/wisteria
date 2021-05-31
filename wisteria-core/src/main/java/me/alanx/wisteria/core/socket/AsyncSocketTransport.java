@@ -1,5 +1,13 @@
 package me.alanx.wisteria.core.socket;
 
+import me.alanx.wisteria.core.concurrent.CompletionFuture;
+import me.alanx.wisteria.core.concurrent.FutureWrapper;
+import me.alanx.wisteria.core.concurrent.SimpleReturnFuture;
+import me.alanx.wisteria.core.transport.IoTransport;
+import me.alanx.wisteria.core.transport.TransportListener;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.AsynchronousSocketChannel;
@@ -7,31 +15,7 @@ import java.nio.channels.CompletionHandler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-
-import me.alanx.wisteria.core.concurrent.CompletionFuture;
-import me.alanx.wisteria.core.concurrent.FutureWrapper;
-import me.alanx.wisteria.core.concurrent.SimpleReturnFuture;
-import me.alanx.wisteria.core.protocol.Packet;
-import me.alanx.wisteria.core.reactor.PassiveSubscription;
-import me.alanx.wisteria.core.reactor.Publisher;
-import me.alanx.wisteria.core.reactor.SubscribeMode;
-import me.alanx.wisteria.core.reactor.Subscriber;
-import me.alanx.wisteria.core.session.Session;
-import me.alanx.wisteria.core.session.SessionListener;
-import me.alanx.wisteria.core.session.SessionManager;
-import me.alanx.wisteria.core.transport.IoTransport;
-import me.alanx.wisteria.core.transport.Transport;
-import me.alanx.wisteria.core.transport.TransportListener;
+import java.util.concurrent.*;
 
 public class AsyncSocketTransport implements IoTransport, TransportListener<ByteBuffer> {
 
@@ -41,13 +25,7 @@ public class AsyncSocketTransport implements IoTransport, TransportListener<Byte
 
 	protected List<TransportListener<ByteBuffer>> transportListeners = new ArrayList<>();
 
-	//private SessionListener<ByteBuffer> sessionListener;
-	
-	private SubscribeMode readMode = SubscribeMode.PASSIVE;
-	
-	private Session session = null;
-	
-	private Subscriber<? super Packet> subscriber;
+
 	
 
 	private final Logger log = LoggerFactory.getLogger(getClass());
@@ -261,10 +239,6 @@ public class AsyncSocketTransport implements IoTransport, TransportListener<Byte
 	@Override
 	public Future<ByteBuffer> read() {
 		
-		if (this.readMode == SubscribeMode.PASSIVE) {
-			throw new IllegalStateException("The read mode is set to passitive. ");
-		}
-		
 		ByteBuffer buffer = ByteBuffer.allocate(32 * 1024);
 		Future<Integer> f = this.channel.read(buffer);
 
@@ -304,8 +278,8 @@ public class AsyncSocketTransport implements IoTransport, TransportListener<Byte
 					@Override
 					public void completed(Integer result, AsynchronousSocketChannel channel) {
 
-						//AsyncSocketTransport.this.transportListeners.forEach(l -> l.onReceived(buf));
-						subscriber.onNext(new Packet(session, buf));
+						AsyncSocketTransport.this.transportListeners.forEach(l -> l.onReceived(AsyncSocketTransport.this, buf));
+						// subscriber.onNext(new Packet(session, buf));
 
 						// start to read next message again
 						startRead(channel);
@@ -343,14 +317,12 @@ public class AsyncSocketTransport implements IoTransport, TransportListener<Byte
 	@Override
 	public void onConnected() {
 
-		
-		if(this.readMode == SubscribeMode.PASSIVE) {
-			if(this.transportListeners == null) {
-				throw new IllegalStateException("The SessinListener is not set. Call listenedBy() to set it before connect. ");
-			}
-			
-			startRead(this.channel);
+
+		if(this.transportListeners == null) {
+			throw new IllegalStateException("The SessinListener is not set. Call listenedBy() to set it before connect. ");
 		}
+
+		startRead(this.channel);
 		
 	}
 	
@@ -358,37 +330,17 @@ public class AsyncSocketTransport implements IoTransport, TransportListener<Byte
 		return new AsyncSocketTransport(channel);
 	}
 
-	@Override
-	public AsyncSocketTransport withReadMode(SubscribeMode mode) {
-		this.readMode = mode;
-		return this;
-	}
 
 
 	@Override
-	public void onReceived(ByteBuffer data) {
-		if (this.session != null)
-			this.subscriber.onNext(new Packet(session, data));
+	public void onReceived(IoTransport transport, ByteBuffer data) {
+
+
 	}
 
 	@Override
-	public void onSent(ByteBuffer data) {}
+	public void onSent(IoTransport transport, ByteBuffer data) {}
 
-	@Override
-	public void subscribe(Subscriber<? super Packet> s) {
-		this.subscriber = s;
-		s.onSubscribe(PassiveSubscription.INSTANCE);
-	}
-
-	@Override
-	public void setSession(Session session) {
-		this.session = session;
-	}
-
-	@Override
-	public Session getSession(Session session) {
-		return this.session;
-	}
 
 	
 }
